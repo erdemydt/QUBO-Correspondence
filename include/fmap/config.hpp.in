@@ -1,0 +1,23 @@
+// Generated from config.hpp.in by CMake -- do not edit the generated copy.
+//
+// Exists so that no source file has to contain a literal filesystem path. The
+// project root is baked in at configure time and everything else is derived
+// from it at runtime (see dataset.hpp).
+
+#pragma once
+
+namespace fmap::config {
+
+// Absolute path to the repository root, as configured.
+inline constexpr const char* kProjectRoot = "@PROJECT_SOURCE_DIR@";
+
+// Directory for generated output (colored meshes, results). Gitignored.
+inline constexpr const char* kOutputDirName = "out";
+
+// Environment variable that overrides kProjectRoot for dataset lookup, for
+// when the meshes do not live inside the repository.
+inline constexpr const char* kDataRootEnvVar = "FMAP_DATA_ROOT";
+
+inline constexpr const char* kVersion = "@PROJECT_VERSION@";
+
+}  // namespace fmap::config
