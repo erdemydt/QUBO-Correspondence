@@ -11,8 +11,8 @@
 namespace fmap {
 namespace {
 
-// Row-major so each point's coordinates are contiguous: both the KD-tree build
-// and the per-query distance evaluations walk points row by row.
+// Row-major so each point is contiguous: both the tree build and the per-query
+// distance evaluations walk points row by row.
 using EmbeddingMatrix =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
@@ -64,9 +64,8 @@ PointMap NearestNeighborStrategy::recover(const FunctionalMap& map,
   }
 
   using KDTree = nanoflann::KDTreeEigenMatrixAdaptor<EmbeddingMatrix>;
-  // Leaf size 16: with a basis of ~100 dimensions the tree is shallow and most
-  // of the work is in the leaf scans, so larger leaves vectorize better than
-  // the library default.
+  // Leaf size 16: at ~100 dimensions the tree is shallow and most work is in
+  // leaf scans, which vectorize better with larger leaves than the default.
   KDTree tree(dimension, std::cref(points), 16);
 
   PointMap result(num_sources);

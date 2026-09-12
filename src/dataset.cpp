@@ -12,8 +12,8 @@
 namespace fmap {
 namespace {
 
-// The one and only place directory names appear. Adding a dataset means adding
-// a row here (and a .gitignore line if the data lives in the repo).
+// The one place directory names appear. A new dataset is a row here, plus a
+// .gitignore line if the data lives in the repo.
 struct DatasetDir {
   const char* name;       // spec prefix, e.g. "scape"
   const char* directory;  // directory under the data root
@@ -28,13 +28,10 @@ bool is_mesh_extension(const std::filesystem::path& ext) {
   return ext == ".off" || ext == ".obj" || ext == ".ply";
 }
 
-// Shape class of a mesh, derived by stripping the trailing index from the
-// stem: "cat3" -> "cat", "mesh007" -> "mesh". Meshes in the same group are
-// the ones that may share a vertex numbering.
-//
-// Note this deliberately leaves "horse0_partial" as its own group rather than
-// folding it in with "horse" -- it has a different vertex count and is not
-// vertex-aligned with the rest of the class.
+// Shape class: strip the trailing index, "cat3" -> "cat". Meshes in a group are
+// the ones that may share a vertex numbering. This deliberately leaves
+// "horse0_partial" in its own group -- it has a different vertex count and is
+// not vertex-aligned with the horse class.
 std::string group_of(const std::string& stem) {
   std::size_t end = stem.size();
   while (end > 0 && std::isdigit(static_cast<unsigned char>(stem[end - 1]))) {
@@ -44,8 +41,7 @@ std::string group_of(const std::string& stem) {
   return end == 0 ? stem : stem.substr(0, end);
 }
 
-// Trailing integer of a stem, or -1 if there isn't one. Used for natural
-// ordering so mesh10 sorts after mesh9.
+// Trailing integer, or -1. For natural ordering: mesh10 sorts after mesh9.
 long index_of(const std::string& stem) {
   std::size_t end = stem.size();
   while (end > 0 && std::isdigit(static_cast<unsigned char>(stem[end - 1]))) {

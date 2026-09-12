@@ -1,5 +1,4 @@
-# Build output. Glob rather than a single name so scratch build trees
-# (build-debug/, build2/, ...) are covered too.
+# Globbed so scratch trees (build-debug/, build2/) are covered too.
 build*/
 out/
 
@@ -9,10 +8,10 @@ CMakeFiles/
 cmake_install.cmake
 compile_commands.json
 _deps/
-tests/
-# Mesh datasets. These are large (SCAPE ~54 MB, TOSCA ~171 MB) and are treated
-# as external inputs, not source. Add a line here when adding a new dataset
-# directory, and register it in include/fmap/dataset.hpp.
+Testing/
+
+# Mesh datasets: large (~225 MB total) and external inputs, not source. A new
+# dataset needs a line here and a row in kDatasetDirs in src/dataset.cpp.
 scape-bim/
 tosca-offs/
 

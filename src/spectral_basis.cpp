@@ -66,9 +66,8 @@ SpectralBasis compute_spectral_basis(const LaplacianOperator& op,
         "non-negative shift makes (L - sigma*M) singular");
   }
 
-  // Rough magnitude of a typical eigenvalue, used to place the shift on the
-  // same scale as the spectrum. sum(L_ii)/sum(M_ii) is a Rayleigh quotient
-  // over the diagonal and carries the right units (1/area).
+  // Typical eigenvalue magnitude, to place the shift on the spectrum's scale:
+  // sum(L_ii)/sum(M_ii) is a diagonal Rayleigh quotient with units of 1/area.
   const double scale = op.L.diagonal().sum() / op.mass.sum();
   if (!(scale > 0.0) || !std::isfinite(scale)) {
     throw std::runtime_error("degenerate Laplacian: cannot estimate spectrum "
@@ -76,8 +75,7 @@ SpectralBasis compute_spectral_basis(const LaplacianOperator& op,
   }
   const double sigma = options.shift_fraction * scale;
 
-  // Spectra requires k < ncv <= n. A larger subspace converges in fewer
-  // restarts at the cost of memory.
+  // Spectra requires k < ncv <= n; larger converges in fewer restarts.
   const Eigen::Index wanted_ncv =
       static_cast<Eigen::Index>(options.ncv_factor * options.k) + 1;
   const int ncv = static_cast<int>(std::min<Eigen::Index>(n, wanted_ncv));
@@ -116,19 +114,17 @@ SpectralBasis compute_spectral_basis(const LaplacianOperator& op,
   SpectralBasis basis;
   basis.mass = op.mass;
 
-  // Shift-invert finds the eigenvalues of the transformed problem in
-  // descending magnitude, which is ascending distance from sigma. Since sigma
-  // sits just below 0 and the spectrum is non-negative, that means the
-  // eigenvalues arrive largest-first and need reversing.
+  // Shift-invert returns the transformed problem in descending magnitude, i.e.
+  // ascending distance from sigma. With sigma just below 0 and the spectrum
+  // non-negative, eigenvalues arrive largest-first and need reversing.
   const Eigen::VectorXd raw_values = solver.eigenvalues();
   const Eigen::MatrixXd raw_vectors = solver.eigenvectors();
 
   basis.eigenvalues = raw_values.reverse();
   basis.eigenvectors = raw_vectors.rowwise().reverse();
 
-  // Guard the assumption above rather than trusting it: if a future Spectra
-  // release changes the ordering, this fails loudly instead of producing a
-  // basis whose modes are in the wrong order.
+  // Guard that assumption: if a future Spectra changes the ordering, fail
+  // loudly rather than return a basis with its modes shuffled.
   for (Eigen::Index i = 1; i < basis.eigenvalues.size(); ++i) {
     if (basis.eigenvalues(i) < basis.eigenvalues(i - 1) - 1e-9 * scale) {
       throw std::runtime_error(
@@ -137,16 +133,15 @@ SpectralBasis compute_spectral_basis(const LaplacianOperator& op,
     }
   }
 
-  // The first eigenvalue is analytically 0 on a closed surface. Tiny negative
-  // values are normal -- roughly 30% of triangles in these datasets are obtuse,
-  // which produces negative cotangent weights -- so clamp rather than reject.
+  // Analytically 0 on a closed surface. Tiny negatives are normal -- ~30% of
+  // triangles here are obtuse, giving negative cotangent weights -- so clamp.
   for (Eigen::Index i = 0; i < basis.eigenvalues.size(); ++i) {
     if (basis.eigenvalues(i) < 0.0) basis.eigenvalues(i) = 0.0;
   }
 
-  // Spectra returns M-orthonormal vectors, but normalize explicitly so the
-  // guarantee holds regardless of solver internals. Callers rely on it for
-  // projection to be a simple transpose.
+  // Spectra already returns these M-orthonormal; redone explicitly so the
+  // guarantee holds regardless of solver internals, since callers rely on it
+  // for projection to be a simple transpose.
   for (Eigen::Index c = 0; c < basis.eigenvectors.cols(); ++c) {
     const double norm = std::sqrt(
         basis.eigenvectors.col(c).cwiseProduct(op.mass).dot(
@@ -154,10 +149,9 @@ SpectralBasis compute_spectral_basis(const LaplacianOperator& op,
     if (norm > 0.0) basis.eigenvectors.col(c) /= norm;
   }
 
-  // Sign is arbitrary for an eigenvector, and Spectra's choice is not stable
-  // across meshes. Fix it by convention so repeated runs on the same mesh are
-  // reproducible. This does NOT make signs consistent *between* two different
-  // meshes -- resolving that is precisely the functional map's job.
+  // Eigenvector sign is arbitrary and Spectra's choice is not stable, so fix it
+  // by convention for reproducible runs. This does NOT make signs consistent
+  // *between* meshes -- resolving that is precisely the functional map's job.
   for (Eigen::Index c = 0; c < basis.eigenvectors.cols(); ++c) {
     if (basis.eigenvectors.col(c).sum() < 0.0) {
       basis.eigenvectors.col(c) *= -1.0;

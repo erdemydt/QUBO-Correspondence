@@ -12,8 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Always emit compile_commands.json so clangd/editors work without extra setup.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# This pipeline is numerically heavy; an unoptimized build is unusably slow on
-# real meshes. Default to Release when the user hasn't chosen.
+# Numerically heavy: an unoptimized build is unusably slow on real meshes.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo)
@@ -35,8 +34,8 @@ configure_file(
   @ONLY
 )
 
-# The pipeline blocks. main.cpp and every test link against this, so each block
-# is compiled once rather than re-instantiating Eigen templates per test binary.
+# main.cpp and every test link this, so each block compiles once instead of
+# re-instantiating Eigen templates per test binary.
 add_library(fmap_core STATIC
   src/dataset.cpp
   src/mesh.cpp

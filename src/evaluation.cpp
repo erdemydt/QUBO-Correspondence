@@ -26,8 +26,8 @@ struct EdgeGraph {
 EdgeGraph build_edge_graph(const Mesh& mesh) {
   const Eigen::Index n = mesh.num_vertices();
 
-  // Count degrees first so the CSR arrays can be filled without per-vertex
-  // vectors; this is the hot structure for every Dijkstra run.
+  // Count degrees first so CSR fills without per-vertex vectors; this is the
+  // hot structure for every Dijkstra run.
   std::vector<Eigen::Index> degree(static_cast<std::size_t>(n), 0);
   auto count_edge = [&](int a, int b) {
     ++degree[static_cast<std::size_t>(a)];
@@ -65,8 +65,8 @@ EdgeGraph build_edge_graph(const Mesh& mesh) {
     add_edge(mesh.F(f, 1), mesh.F(f, 2));
     add_edge(mesh.F(f, 2), mesh.F(f, 0));
   }
-  // Duplicate entries (each interior edge appears in two triangles) are left
-  // in place: Dijkstra is indifferent to them and deduplicating costs more.
+  // Duplicates (each interior edge is in two triangles) are left in place:
+  // Dijkstra is indifferent and deduplicating costs more.
   return graph;
 }
 
@@ -118,20 +118,15 @@ Eigen::VectorXd geodesic_distances_from(const Mesh& mesh, Eigen::Index source) {
 }
 
 bool has_identity_ground_truth(const Mesh& source, const Mesh& target) {
-  // Matching vertex counts, and nothing stronger.
+  // Matching vertex counts, and nothing stronger. Requiring identical faces is
+  // tempting but wrong: SCAPE poses share a vertex registration yet ~24% of
+  // their faces disagree, because quads get split along opposite diagonals --
+  // the same four vertices either way, so the correspondence is unaffected.
   //
-  // Requiring identical face arrays is tempting but wrong. SCAPE poses share a
-  // vertex registration -- vertex i is the same material point on every mesh --
-  // yet their triangulations differ: about 24% of faces disagree, because quads
-  // get split along opposite diagonals. Those are the same four vertices either
-  // way, so the correspondence is unaffected.
-  //
-  // Whether a shared numbering really is a registration is a property of the
-  // dataset, not something recoverable from the geometry. It holds within SCAPE
-  // and within a TOSCA shape class; see same_shape_class() in dataset.hpp for
-  // the check that uses that knowledge. Here we only enforce the structural
-  // precondition, which is enough to reject the mismatches that matter --
-  // different classes and TOSCA's partial horse all differ in vertex count.
+  // Whether a shared numbering really is a registration is dataset knowledge,
+  // not geometry; same_shape_class() in dataset.hpp carries that. This only
+  // enforces the structural precondition, which already rejects the mismatches
+  // that matter -- other classes and the partial horse differ in vertex count.
   return source.num_vertices() == target.num_vertices() &&
          source.num_vertices() > 0;
 }
@@ -155,8 +150,7 @@ EvaluationResult evaluate_against_identity(const PointMap& map,
 
   const Eigen::Index n = source.num_vertices();
 
-  // Choose which vertices to score. Sampling because each one costs a full
-  // Dijkstra run over the target.
+  // Sampled because each scored vertex costs a full Dijkstra over the target.
   std::vector<Eigen::Index> samples;
   if (options.num_samples <= 0 || options.num_samples >= n) {
     samples.resize(static_cast<std::size_t>(n));
@@ -170,8 +164,8 @@ EvaluationResult evaluate_against_identity(const PointMap& map,
     samples = std::move(all);
   }
 
-  // Normalizing by sqrt(area) makes the metric scale-free, so SCAPE and TOSCA
-  // numbers are directly comparable despite their very different units.
+  // sqrt(area) makes the metric scale-free, so SCAPE and TOSCA numbers compare
+  // directly despite their very different units.
   const double normalizer = std::sqrt(target.surface_area());
   if (!(normalizer > 0.0)) {
     throw std::runtime_error("target mesh has zero area");

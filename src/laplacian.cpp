@@ -27,14 +27,14 @@ LaplacianOperator build_laplacian(const Mesh& mesh) {
     const Eigen::Vector3d cross = (p[1] - p[0]).cross(p[2] - p[0]);
     const double double_area = cross.norm();
 
-    // Degenerate triangle: no well-defined angles. Skip it rather than emit
-    // infinities; an isolated sliver does not meaningfully change the operator.
+    // No well-defined angles. Skip rather than emit infinities; an isolated
+    // sliver does not meaningfully change the operator.
     if (double_area < 1e-20) continue;
 
     const double area = 0.5 * double_area;
 
-    // Barycentric lumping: each vertex takes a third of each incident triangle.
-    // The entries therefore sum to the total surface area.
+    // Barycentric lumping: a third of each incident triangle per vertex, so the
+    // entries sum to the surface area.
     for (int k = 0; k < 3; ++k) op.mass(idx[k]) += area / 3.0;
 
     bool obtuse = false;
@@ -46,14 +46,14 @@ LaplacianOperator build_laplacian(const Mesh& mesh) {
       const Eigen::Vector3d u = p[b] - p[a];
       const Eigen::Vector3d v = p[c] - p[a];
 
-      // cot(theta) = cos/sin = dot(u,v) / |u x v|, and |u x v| is the same
-      // 2*area for all three angles of the triangle.
+      // cot = cos/sin = dot(u,v) / |u x v|, and |u x v| is the same 2*area for
+      // all three angles.
       const double dot = u.dot(v);
       if (dot < 0.0) obtuse = true;
       const double cotangent = dot / double_area;
 
-      // Standard cotangent weight: each interior edge picks up cot of the
-      // angle opposite it in each of its two adjacent triangles, halved.
+      // Each interior edge picks up cot of its opposite angle in each of the
+      // two adjacent triangles, halved.
       const double w = 0.5 * cotangent;
       stiffness.emplace_back(idx[b], idx[b], w);
       stiffness.emplace_back(idx[c], idx[c], w);
@@ -67,9 +67,8 @@ LaplacianOperator build_laplacian(const Mesh& mesh) {
   op.L.setFromTriplets(stiffness.begin(), stiffness.end());
   op.L.makeCompressed();
 
-  // A vertex with zero area would make M singular and the generalized
-  // eigenproblem ill-posed. This should not happen on a mesh where every
-  // vertex is used by a face, so treat it as a real error rather than clamping.
+  // Zero area makes M singular and the eigenproblem ill-posed. Impossible when
+  // every vertex is used by a face, so it is an error, not something to clamp.
   if (op.mass.minCoeff() <= 0.0) {
     throw std::runtime_error(
         "mesh has a vertex with zero lumped area; the mass matrix is singular");

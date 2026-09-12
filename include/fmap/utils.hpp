@@ -1,5 +1,4 @@
 // Small shared helpers used across the pipeline blocks.
-
 #pragma once
 
 #include <algorithm>
@@ -11,12 +10,9 @@
 
 namespace fmap {
 
-// Run body(i) for i in [0, count), spread across hardware threads.
-//
-// The pipeline's expensive loops -- per-vertex nearest neighbour queries, per
-// row map solves -- are all independent, so this covers every case without
-// pulling in OpenMP or a task library. Exceptions thrown inside `body` would
-// cross a thread boundary, so callers must not throw from it.
+// body(i) for i in [0, count), spread across hardware threads. Every expensive
+// loop here is independent, so this covers them all without OpenMP or a task
+// library. `body` must not throw -- the exception would cross a thread boundary.
 template <typename Body>
 void parallel_for(std::size_t count, const Body& body,
                   std::size_t min_per_thread = 256) {
@@ -49,7 +45,7 @@ void parallel_for(std::size_t count, const Body& body,
   for (std::thread& w : workers) w.join();
 }
 
-// Wall-clock stopwatch for reporting stage timings.
+// Wall-clock stopwatch for stage timings.
 class Timer {
  public:
   Timer() : start_(std::chrono::steady_clock::now()) {}

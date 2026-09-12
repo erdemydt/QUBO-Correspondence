@@ -55,24 +55,22 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
   const Eigen::VectorXd lambda1 = source.eigenvalues / scale1;
   const Eigen::VectorXd lambda2 = target.eigenvalues / scale2;
 
-  // Normal equations, shared across all rows: A A^T is k1 x k1 and does not
-  // depend on which row of C is being solved.
+  // Shared across all rows: A A^T is k1 x k1 and row-independent.
   const Eigen::MatrixXd AAt = A * A.transpose();
   const Eigen::MatrixXd ABt = A * B.transpose();  // k1 x k2
 
   FunctionalMap result;
   result.C.resize(k2, k1);
 
-  // One ridge regression per row of C. The penalty is diagonal but differs
-  // per row, which is exactly why this decomposes so cleanly: row i of C pairs
-  // target frequency lambda2_i against every source frequency, and entries
-  // pairing very different frequencies are pushed toward zero.
-  // A A^T has rank at most d, so with fewer descriptors than basis functions it
-  // is singular. The commutativity penalty regularizes most of that away, but
-  // not entry (0, 0): lambda1_0 and lambda2_0 are both zero on a closed
-  // surface, so the penalty there vanishes identically. A small Tikhonov ridge
-  // covers that hole. It is scaled to the data so it stays negligible relative
-  // to the descriptor term rather than biasing the fit.
+  // One ridge regression per row. The penalty is diagonal but differs per row,
+  // which is why this decomposes: row i pairs target frequency lambda2_i
+  // against every source frequency, pushing mismatched pairings toward zero.
+  //
+  // A A^T has rank at most d, so fewer descriptors than basis functions leaves
+  // it singular. The penalty regularizes most of that away but not entry (0,0),
+  // where lambda1_0 = lambda2_0 = 0 on a closed surface makes it vanish. The
+  // Tikhonov ridge covers that hole, scaled to the data so it stays negligible
+  // against the descriptor term rather than biasing the fit.
   const double ridge = 1e-9 * AAt.trace() / static_cast<double>(k1);
 
   Eigen::MatrixXd system(k1, k1);
@@ -83,8 +81,7 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
       system(j, j) += options.commutativity_weight * gap * gap + ridge;
     }
 
-    // LDLT: the system is symmetric and, with the ridge above, positive
-    // definite.
+    // Symmetric and, with the ridge above, positive definite.
     const Eigen::LDLT<Eigen::MatrixXd> solver(system);
     if (solver.info() != Eigen::Success) {
       throw std::runtime_error(

@@ -1,12 +1,8 @@
-// Functional maps pipeline -- single entry point.
-//
-// This file stays thin on purpose: it parses arguments, then runs the blocks in
-// include/fmap/ in order. Every stage is a library call, so the pipeline reads
-// top-to-bottom as the method itself:
+// Functional maps pipeline -- the single entry point. Thin on purpose: parse
+// arguments, then run the blocks in include/fmap/ in order, so the file reads
+// top-to-bottom as the method itself. Algorithmic work belongs in the blocks.
 //
 //     mesh -> Laplacian -> spectral basis -> descriptors -> C -> point map
-//
-// Algorithmic work belongs in the blocks, not here.
 
 #include "fmap/config.hpp"
 #include "fmap/correspondence.hpp"
@@ -65,16 +61,16 @@ void stage(const std::string& label, double seconds) {
             << std::defaultfloat;
 }
 
-// Accepts either a dataset spec or a filesystem path, so the pipeline can be
-// pointed at meshes outside the registered datasets without special casing.
+// Dataset spec or filesystem path, so meshes outside the registered datasets
+// need no special casing.
 fmap::Mesh load_any(const std::string& what) {
   if (what.find(':') != std::string::npos) return fmap::load_mesh(what);
   return fmap::load_mesh_file(what);
 }
 
-// Resolves to a registry entry when the input was a dataset spec. Used to tell
-// whether the two meshes share a vertex registration, which is what makes the
-// identity a valid ground-truth map.
+// Resolves to a registry entry when the input was a spec, which is how we tell
+// whether the meshes share a vertex registration and the identity is valid
+// ground truth.
 std::optional<fmap::MeshRef> try_resolve(const fmap::DatasetRegistry& registry,
                                          const std::string& what) {
   if (what.find(':') == std::string::npos) return std::nullopt;
@@ -213,8 +209,8 @@ int run_pipeline(const Settings& settings) {
             << std::defaultfloat;
 
   // ---- scoring ------------------------------------------------------------
-  // Only meaningful when the two meshes share a vertex registration. That is a
-  // dataset property: it holds within SCAPE and within a TOSCA shape class.
+  // Only meaningful when the meshes share a vertex registration -- a dataset
+  // property, holding within SCAPE and within a TOSCA shape class.
   const auto source_ref = try_resolve(registry, settings.source);
   const auto target_ref = try_resolve(registry, settings.target);
   const bool same_class =

@@ -24,10 +24,9 @@ std::string read_file(const std::filesystem::path& path) {
   return buf.str();
 }
 
-// Whitespace-separated token scanner that treats '#' as a comment to
-// end-of-line. OFF files in the wild vary in how they wrap lines -- counts
-// sometimes share a line with the "OFF" header -- so tokenizing the whole file
-// is more robust than reading it line by line.
+// Whitespace-separated tokens, '#' comments to end-of-line. OFF files vary in
+// how they wrap lines -- counts sometimes share the "OFF" header line -- so
+// tokenizing beats reading line by line.
 class TokenScanner {
  public:
   explicit TokenScanner(const std::string& text) : text_(text) {}
@@ -47,8 +46,8 @@ class TokenScanner {
   double next_double(const char* what) {
     std::string_view tok;
     if (!next(tok)) throw std::runtime_error(missing(what));
-    // strtod needs NUL termination; the scratch string avoids allocating a
-    // fresh std::string per token in the hot loop.
+    // strtod needs NUL termination; the scratch string avoids a fresh
+    // std::string per token in the hot loop.
     scratch_.assign(tok);
     const char* begin = scratch_.c_str();
     char* end = nullptr;
@@ -128,14 +127,12 @@ Mesh load_off(const std::filesystem::path& path) {
   if (!scan.next(magic)) {
     throw std::runtime_error("empty OFF file: " + path.string());
   }
-  // Accept the OFF variants: COFF (per-vertex colour), NOFF (normals), STOFF
-  // (texture coords), 4OFF (homogeneous coordinates). The vertex block is
-  // parsed a line at a time and only the leading coordinates are taken, so any
-  // combination of trailing per-vertex attributes is handled without the reader
-  // having to know how many numbers each adds.
-  //
-  // That matters because the colour block is genuinely ambiguous: COFF permits
-  // 1, 3, or 4 channels and the header does not say which.
+  // Accept the OFF variants -- COFF (colour), NOFF (normals), STOFF (texture),
+  // 4OFF (homogeneous). The vertex block is read a line at a time, taking only
+  // the leading coordinates, so any trailing per-vertex attributes work without
+  // the reader knowing how many numbers each adds. That matters because the
+  // colour block is genuinely ambiguous: COFF permits 1, 3, or 4 channels and
+  // the header does not say which.
   const bool homogeneous = magic.find('4') != std::string_view::npos;
   if (magic.find("OFF") == std::string_view::npos) {
     throw std::runtime_error("not an OFF file (bad magic '" +
@@ -144,9 +141,8 @@ Mesh load_off(const std::filesystem::path& path) {
 
   const long num_vertices = scan.next_long("vertex count");
   const long num_faces = scan.next_long("face count");
-  // The third header field is the edge count. It is unreliable -- TOSCA's
-  // horse0_partial.off declares 0 -- so it is read and discarded rather than
-  // used to size anything.
+  // Third header field is the edge count, unreliable (TOSCA's
+  // horse0_partial.off declares 0), so read and discarded.
   (void)scan.next_long("edge count");
 
   if (num_vertices <= 0 || num_faces < 0) {
@@ -187,8 +183,7 @@ Mesh load_off(const std::filesystem::path& path) {
     mesh.V(i, 2) = xyzw[2] * scale;
   }
 
-  // Faces may be polygons; fan-triangulate anything above 3 sides so the
-  // loader doesn't reject an otherwise usable mesh.
+  // Fan-triangulate polygons rather than reject an otherwise usable mesh.
   std::vector<std::array<int, 3>> tris;
   tris.reserve(static_cast<std::size_t>(num_faces));
   for (long f = 0; f < num_faces; ++f) {
@@ -245,9 +240,8 @@ Mesh load_obj(const std::filesystem::path& path) {
     mesh.V(static_cast<Eigen::Index>(i), 2) = attrib.vertices[3 * i + 2];
   }
 
-  // tinyobjloader hands back per-shape index lists with separate position,
-  // normal and texcoord indices; we keep only the position index, which is the
-  // one that defines the mesh connectivity.
+  // tinyobjloader returns separate position/normal/texcoord indices; only the
+  // position index defines connectivity.
   std::vector<std::array<int, 3>> tris;
   for (const tinyobj::shape_t& shape : reader.GetShapes()) {
     const auto& indices = shape.mesh.indices;
