@@ -1,10 +1,7 @@
-// Scoring a recovered correspondence. Both datasets make ground truth free:
-// vertex i is the same material point across SCAPE meshes, and across meshes
-// within a TOSCA class, so the true map is the identity permutation.
-//
-// Exact-match rate alone is too harsh -- landing one vertex away is nearly
-// right -- so the main metric is geodesic error, normalized by sqrt(area) to
-// stay comparable across meshes and datasets.
+// Scoring a recovered map. Vertex i is the same material point across SCAPE
+// meshes and within a TOSCA class, so the truth is the identity permutation.
+// Exact-match rate alone is too harsh -- one vertex off is nearly right -- so
+// the metric is geodesic error normalized by sqrt(area).
 
 #pragma once
 
@@ -17,20 +14,15 @@
 
 namespace fmap {
 
-// Dijkstra with Euclidean edge weights. Forcing paths onto edges overestimates
-// true geodesic distance, but on meshes this well tessellated the bias is small
-// and uniform, which is all a comparative metric needs. Fast marching or MMP
-// would be the upgrade if absolute numbers ever mattered.
+// Dijkstra on mesh edges. Forcing paths onto edges overestimates, but the bias
+// is small and uniform at these tessellations, which is all a comparative
+// metric needs. Fast marching would be the upgrade if absolutes mattered.
 Eigen::VectorXd geodesic_distances_from(const Mesh& mesh, Eigen::Index source);
 
 struct EvaluationOptions {
-  // Each sample costs one Dijkstra run over the target, hence sampling rather
-  // than exhaustive. <= 0 evaluates every vertex.
-  int num_samples = 1000;
-
+  int num_samples = 1000;  // one Dijkstra each, hence sampled; <= 0 means all
   unsigned seed = 42;
-
-  double max_curve_threshold = 0.25;  // in normalized geodesic units
+  double max_curve_threshold = 0.25;
   int curve_points = 26;
 };
 
@@ -43,26 +35,23 @@ struct EvaluationResult {
   double median_geodesic_error = 0.0;
   double max_geodesic_error = 0.0;
 
-  // Princeton-style cumulative curve: fractions[i] is the share of samples
-  // with error at most thresholds[i].
+  // Princeton-style cumulative curve.
   std::vector<double> thresholds;
   std::vector<double> fractions;
 
   double within(double threshold) const;
 };
 
-// Checked structurally rather than assumed -- TOSCA's horse0_partial has a
-// different vertex count from the rest of its class.
+// Checked, not assumed: TOSCA's horse0_partial differs from its class.
 bool has_identity_ground_truth(const Mesh& source, const Mesh& target);
 
-// Throws std::runtime_error if the meshes are not vertex-aligned, rather than
-// silently reporting meaningless numbers.
+// Throws if the meshes are not vertex-aligned, rather than reporting
+// meaningless numbers.
 EvaluationResult evaluate_against_identity(const PointMap& map,
                                            const Mesh& source,
                                            const Mesh& target,
                                            const EvaluationOptions& options = {});
 
-// The cumulative curve as a compact text plot for the console.
 std::string format_error_curve(const EvaluationResult& result);
 
 }  // namespace fmap

@@ -1,7 +1,5 @@
-// HKS and WKS. The load-bearing test is pose invariance: two SCAPE meshes are
-// one person in two poses sharing a vertex numbering, so vertex i is the same
-// material point on both. Descriptors are only useful if they agree there and
-// disagree elsewhere.
+// The load-bearing test is pose invariance: vertex i is the same material point
+// across SCAPE poses, so descriptors must agree there and disagree elsewhere.
 
 #include "fmap/descriptors.hpp"
 
@@ -30,7 +28,7 @@ void test_shape(const char* name, const Eigen::MatrixXd& d,
   check(d.cols() > 0, "produced at least one sample");
   check(d.allFinite(), "all values are finite");
 
-  // A descriptor that is constant across the surface carries no information.
+  // A constant descriptor carries no information.
   Eigen::Index degenerate = 0;
   for (Eigen::Index c = 0; c < d.cols(); ++c) {
     const double spread = d.col(c).maxCoeff() - d.col(c).minCoeff();
@@ -49,8 +47,7 @@ void test_pose_invariance() {
   const Eigen::MatrixXd da = fmap::compute_all_descriptors(basis_for(a));
   const Eigen::MatrixXd db = fmap::compute_all_descriptors(basis_for(b));
 
-  // Same vertex across meshes vs. an unrelated vertex. The former must be much
-  // closer or the descriptors are not doing their job.
+  // Same vertex across meshes must beat an unrelated one, by a lot.
   std::mt19937 rng(12345);
   std::uniform_int_distribution<Eigen::Index> pick(0, a.num_vertices() - 1);
 
@@ -87,16 +84,15 @@ void test_scale_invariance() {
   const Eigen::MatrixXd d0 = fmap::compute_all_descriptors(basis_for(original));
   const Eigen::MatrixXd d1 = fmap::compute_all_descriptors(basis_for(scaled));
 
-  // Sampling ranges come from the eigenvalues, which scale inversely with area,
-  // so the two should agree. Normalization is mass-weighted and mass scales
-  // with area, hence the rescale.
+  // Sampling ranges come from eigenvalues, which scale as 1/area; normalization
+  // is mass-weighted and mass scales with area, hence the rescale.
   const double factor = 7.5;
   const Eigen::MatrixXd diff = (d0 - d1 * factor).cwiseAbs();
   const double denom = d0.cwiseAbs().maxCoeff();
   const double relative = diff.maxCoeff() / denom;
   const double mean_relative = diff.mean() / denom;
 
-  // Diagnostic: how well do the two spectra agree after undoing the scaling?
+  // Diagnostic: agreement after undoing the scaling.
   const SpectralBasis b0 = basis_for(original);
   const SpectralBasis b1 = basis_for(scaled);
   const Eigen::VectorXd rescaled = b1.eigenvalues * (factor * factor);
@@ -110,11 +106,9 @@ void test_scale_invariance() {
       worst_at = i;
     }
   }
-  // Within a near-degenerate pair the eigenvectors are not uniquely determined
-  // -- they rotate freely inside the shared eigenspace -- so phi_i(x)^2 is
-  // unstable even where the eigenvalues are exact. That is the mechanism behind
-  // the outlier deviations below, and behind the left/right symmetry flips
-  // functional maps are prone to on human shapes.
+  // Eigenvectors in a near-degenerate pair rotate freely in their shared
+  // eigenspace, so phi_i(x)^2 is unstable even where eigenvalues are exact.
+  // That drives the outliers below, and the left/right symmetry flips.
   Eigen::Index near_degenerate = 0;
   for (Eigen::Index i = 1; i < b0.eigenvalues.size(); ++i) {
     const double gap = b0.eigenvalues(i) - b0.eigenvalues(i - 1);
@@ -128,12 +122,10 @@ void test_scale_invariance() {
   std::cout << "       near-degenerate eigenvalue pairs: " << near_degenerate
             << " of " << b0.count() << "\n";
 
-  // Eigenvalues are uniquely determined and must match almost exactly: this is
-  // the real test that the operator and shift placement are scale-invariant.
+  // Eigenvalues are unique and must match: the real scale-invariance test.
   check(worst_eig < 1e-9, "spectrum is scale-invariant to machine precision");
 
-  // Asserted on the mean, not the max: the max is dominated by the outliers
-  // from degenerate subspaces above, which is not what this test is about.
+  // Mean, not max: the max is dominated by the degenerate-subspace outliers.
   check(mean_relative < 0.01, "descriptors are invariant to uniform scaling");
   check(relative < 0.15, "outliers stay bounded");
   check(near_degenerate > 0,
@@ -160,7 +152,7 @@ void test_options() {
   const Eigen::MatrixXd both = fmap::compute_all_descriptors(basis, opts);
   check(both.cols() == sparse.cols() * 2, "combined descriptor concatenates");
 
-  // Normalization should make every column unit norm under the mass metric.
+  // Every column unit norm under the mass metric.
   opts.normalize = true;
   const Eigen::MatrixXd normalized = fmap::compute_wks(basis, opts);
   double worst = 0.0;

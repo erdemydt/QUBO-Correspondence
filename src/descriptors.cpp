@@ -22,16 +22,14 @@ void validate(const SpectralBasis& basis, const DescriptorOptions& options) {
   }
 }
 
-// Indices of the samples to keep, given the subsampling step.
 std::vector<int> retained_samples(int num_samples, int step) {
   std::vector<int> keep;
   for (int i = 0; i < num_samples; i += step) keep.push_back(i);
   return keep;
 }
 
-// First meaningfully non-zero eigenvalue. lambda_0 is 0 by construction and WKS
-// takes a logarithm, so the constant mode must be skipped; near-duplicates of 0
-// also appear when the mesh has several connected components.
+// lambda_0 is 0 and WKS takes a log, so the constant mode must go; near-zero
+// duplicates also appear with several connected components.
 Eigen::Index first_nonzero_mode(const SpectralBasis& basis) {
   const double scale = basis.eigenvalues(basis.count() - 1);
   const double floor_value = 1e-8 * std::max(scale, 1e-300);
@@ -52,8 +50,7 @@ void normalize_descriptors(Eigen::MatrixXd& descriptors,
   for (Eigen::Index c = 0; c < descriptors.cols(); ++c) {
     const double norm = std::sqrt(
         descriptors.col(c).cwiseProduct(mass).dot(descriptors.col(c)));
-    // A flat column is legitimate (an unreachable time scale); leave it rather
-    // than amplify numerical noise.
+    // A flat column is legitimate; don't amplify noise.
     if (norm > 1e-12) descriptors.col(c) /= norm;
   }
 }
@@ -69,8 +66,7 @@ Eigen::MatrixXd compute_hks(const SpectralBasis& basis,
   const double lambda_min = basis.eigenvalues(first);
   const double lambda_max = basis.eigenvalues(k - 1);
 
-  // Time range from Sun et al.: where the heat kernel carries information,
-  // bounded by the spectrum's extremes and so adapting to mesh scale for free.
+  // Sun et al.'s range, bounded by the spectrum, so it adapts to scale.
   const double kSpread = 4.0 * std::log(10.0);
   const double t_min = kSpread / lambda_max;
   const double t_max = kSpread / lambda_min;
@@ -79,8 +75,7 @@ Eigen::MatrixXd compute_hks(const SpectralBasis& basis,
                                                  options.step);
   Eigen::MatrixXd out(n, static_cast<Eigen::Index>(keep.size()));
 
-  // Log spacing: diffusion is scale-free, so equal ratios of t carry equal
-  // information.
+  // Diffusion is scale-free: equal ratios of t carry equal information.
   const double log_t_min = std::log(t_min);
   const double log_t_max = std::log(t_max);
   const double dt = (options.num_samples > 1)
@@ -99,8 +94,7 @@ Eigen::MatrixXd compute_hks(const SpectralBasis& basis,
 
     Eigen::VectorXd column = phi_squared * decay;
 
-    // Divide by the heat trace, or the descriptor is dominated by its overall
-    // magnitude -- which carries no correspondence information -- not its shape.
+    // Divide by the heat trace, or magnitude dominates shape.
     const double trace = decay.sum();
     if (trace > 1e-300) column /= trace;
 
@@ -119,7 +113,7 @@ Eigen::MatrixXd compute_wks(const SpectralBasis& basis,
   const Eigen::Index k = basis.count();
   const Eigen::Index first = first_nonzero_mode(basis);
 
-  // WKS works in log-energy, which is why lambda_0 = 0 must be excluded.
+  // Log-energy, hence excluding lambda_0 = 0.
   const Eigen::Index num_modes = k - first;
   Eigen::VectorXd log_lambda(num_modes);
   for (Eigen::Index i = 0; i < num_modes; ++i) {
@@ -127,8 +121,8 @@ Eigen::MatrixXd compute_wks(const SpectralBasis& basis,
   }
 
   const double e_min = log_lambda(0);
-  // The 1.02 divisor is the reference implementation's: it pulls the top of the
-  // range just inside the last eigenvalue, where truncation hurts most.
+  // 1.02 is the reference implementation's: keeps the top inside the last
+  // eigenvalue, where truncation hurts most.
   const double e_max = log_lambda(num_modes - 1) / 1.02;
 
   const double de = (options.num_samples > 1)
@@ -157,8 +151,7 @@ Eigen::MatrixXd compute_wks(const SpectralBasis& basis,
       weights(i) = std::exp(-d * d * inv_two_sigma_sq);
     }
 
-    // C_e in the paper: each band becomes a weighted average, not a sum, so
-    // bands with few modes are not systematically smaller.
+    // C_e: a weighted average per band, so sparse bands aren't small.
     const double total = weights.sum();
     Eigen::VectorXd column = phi_squared * weights;
     if (total > 1e-300) column /= total;

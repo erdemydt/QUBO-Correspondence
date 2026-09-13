@@ -16,7 +16,7 @@
 namespace fmap {
 namespace {
 
-// Adjacency list over mesh edges, with Euclidean lengths as weights.
+// CSR adjacency with Euclidean edge weights.
 struct EdgeGraph {
   std::vector<Eigen::Index> offsets;    // size n+1, CSR-style
   std::vector<Eigen::Index> neighbors;
@@ -26,8 +26,7 @@ struct EdgeGraph {
 EdgeGraph build_edge_graph(const Mesh& mesh) {
   const Eigen::Index n = mesh.num_vertices();
 
-  // Count degrees first so CSR fills without per-vertex vectors; this is the
-  // hot structure for every Dijkstra run.
+  // Degrees first, so CSR fills without per-vertex vectors.
   std::vector<Eigen::Index> degree(static_cast<std::size_t>(n), 0);
   auto count_edge = [&](int a, int b) {
     ++degree[static_cast<std::size_t>(a)];
@@ -65,12 +64,10 @@ EdgeGraph build_edge_graph(const Mesh& mesh) {
     add_edge(mesh.F(f, 1), mesh.F(f, 2));
     add_edge(mesh.F(f, 2), mesh.F(f, 0));
   }
-  // Duplicates (each interior edge is in two triangles) are left in place:
-  // Dijkstra is indifferent and deduplicating costs more.
+  // Duplicate edges left in: Dijkstra is indifferent, dedup costs more.
   return graph;
 }
 
-// Single-source shortest path. Returns distances to every vertex.
 Eigen::VectorXd dijkstra(const EdgeGraph& graph, Eigen::Index n,
                          Eigen::Index source) {
   Eigen::VectorXd distance =
@@ -118,15 +115,12 @@ Eigen::VectorXd geodesic_distances_from(const Mesh& mesh, Eigen::Index source) {
 }
 
 bool has_identity_ground_truth(const Mesh& source, const Mesh& target) {
-  // Matching vertex counts, and nothing stronger. Requiring identical faces is
-  // tempting but wrong: SCAPE poses share a vertex registration yet ~24% of
-  // their faces disagree, because quads get split along opposite diagonals --
-  // the same four vertices either way, so the correspondence is unaffected.
-  //
-  // Whether a shared numbering really is a registration is dataset knowledge,
-  // not geometry; same_shape_class() in dataset.hpp carries that. This only
-  // enforces the structural precondition, which already rejects the mismatches
-  // that matter -- other classes and the partial horse differ in vertex count.
+  // Vertex counts only. Requiring identical faces is tempting but wrong: SCAPE
+  // poses share a registration yet ~24% of their faces disagree (quads split
+  // along opposite diagonals), the same four vertices either way. Whether a
+  // shared numbering IS a registration is dataset knowledge -- see
+  // same_shape_class(). This is just the structural precondition, which already
+  // rejects what matters: other classes and the partial horse differ in count.
   return source.num_vertices() == target.num_vertices() &&
          source.num_vertices() > 0;
 }
@@ -150,7 +144,7 @@ EvaluationResult evaluate_against_identity(const PointMap& map,
 
   const Eigen::Index n = source.num_vertices();
 
-  // Sampled because each scored vertex costs a full Dijkstra over the target.
+  // Sampled: each scored vertex costs a full Dijkstra.
   std::vector<Eigen::Index> samples;
   if (options.num_samples <= 0 || options.num_samples >= n) {
     samples.resize(static_cast<std::size_t>(n));
@@ -164,8 +158,7 @@ EvaluationResult evaluate_against_identity(const PointMap& map,
     samples = std::move(all);
   }
 
-  // sqrt(area) makes the metric scale-free, so SCAPE and TOSCA numbers compare
-  // directly despite their very different units.
+  // sqrt(area) makes SCAPE and TOSCA numbers directly comparable.
   const double normalizer = std::sqrt(target.surface_area());
   if (!(normalizer > 0.0)) {
     throw std::runtime_error("target mesh has zero area");
@@ -177,7 +170,6 @@ EvaluationResult evaluate_against_identity(const PointMap& map,
   parallel_for(samples.size(), [&](std::size_t s) {
     const Eigen::Index truth = samples[s];
     const Eigen::Index got = map(truth);
-    // Distances from the ground-truth vertex; read off the recovered one.
     const Eigen::VectorXd distance = dijkstra(graph, target.num_vertices(), truth);
     const double d = distance(got);
     errors[s] = std::isfinite(d) ? d / normalizer : 1.0;
@@ -203,7 +195,6 @@ EvaluationResult evaluate_against_identity(const PointMap& map,
   std::sort(sorted.begin(), sorted.end());
   result.median_geodesic_error = sorted[sorted.size() / 2];
 
-  // Cumulative curve.
   const int points = std::max(2, options.curve_points);
   result.thresholds.reserve(static_cast<std::size_t>(points));
   result.fractions.reserve(static_cast<std::size_t>(points));

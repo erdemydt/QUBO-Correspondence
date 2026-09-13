@@ -1,6 +1,5 @@
-// Functional maps pipeline -- the single entry point. Thin on purpose: parse
-// arguments, then run the blocks in include/fmap/ in order, so the file reads
-// top-to-bottom as the method itself. Algorithmic work belongs in the blocks.
+// The single entry point. Thin on purpose: parse arguments, then run the blocks
+// in include/fmap/ in order. Algorithmic work belongs in the blocks.
 //
 //     mesh -> Laplacian -> spectral basis -> descriptors -> C -> point map
 
@@ -61,16 +60,14 @@ void stage(const std::string& label, double seconds) {
             << std::defaultfloat;
 }
 
-// Dataset spec or filesystem path, so meshes outside the registered datasets
-// need no special casing.
+// Spec or path, so external meshes need no special casing.
 fmap::Mesh load_any(const std::string& what) {
   if (what.find(':') != std::string::npos) return fmap::load_mesh(what);
   return fmap::load_mesh_file(what);
 }
 
-// Resolves to a registry entry when the input was a spec, which is how we tell
-// whether the meshes share a vertex registration and the identity is valid
-// ground truth.
+// A registry entry when the input was a spec: how we tell whether the identity
+// is valid ground truth.
 std::optional<fmap::MeshRef> try_resolve(const fmap::DatasetRegistry& registry,
                                          const std::string& what) {
   if (what.find(':') == std::string::npos) return std::nullopt;
@@ -99,7 +96,7 @@ int list_meshes(const std::string& which) {
       const auto meshes = registry.meshes(dataset, group);
       std::cout << "  " << std::left << std::setw(16) << group << std::setw(5)
                 << meshes.size() << " ";
-      // Print the ids rather than a range: these datasets have index gaps.
+      // Ids, not a range: these datasets have gaps.
       for (std::size_t i = 0; i < meshes.size() && i < 8; ++i) {
         std::cout << meshes[i].stem << ' ';
       }
@@ -209,8 +206,7 @@ int run_pipeline(const Settings& settings) {
             << std::defaultfloat;
 
   // ---- scoring ------------------------------------------------------------
-  // Only meaningful when the meshes share a vertex registration -- a dataset
-  // property, holding within SCAPE and within a TOSCA shape class.
+  // Only meaningful when the meshes share a vertex registration.
   const auto source_ref = try_resolve(registry, settings.source);
   const auto target_ref = try_resolve(registry, settings.target);
   const bool same_class =
@@ -253,11 +249,9 @@ int run_pipeline(const Settings& settings) {
   if (settings.write_output) {
     const std::filesystem::path out = registry.output_dir();
 
-    // Colour the target by position, then pull those colours back along the
-    // map onto the source. If the map is right the source comes out looking
-    // like an anatomically matched copy of the target's colouring; errors show
-    // up as speckle, and a left/right symmetry flip -- the classic failure mode
-    // -- is visible as mirrored colour.
+    // Colour the target by position and pull it back onto the source. A good
+    // map looks anatomically matched; errors speckle, and a symmetry flip
+    // mirrors the colour.
     const fmap::ColorMatrix target_colors = fmap::position_colors(target);
     fmap::ColorMatrix source_colors(source.num_vertices(), 3);
     for (Eigen::Index i = 0; i < source.num_vertices(); ++i) {

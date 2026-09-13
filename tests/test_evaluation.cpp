@@ -1,6 +1,5 @@
-// Scoring against identity ground truth, calibrated against two known answers:
-// a perfect map scores zero, a random one scores near chance. A metric that
-// cannot separate those is not measuring anything.
+// Calibrated against two known answers: a perfect map scores zero, a random one
+// near chance. A metric that cannot separate those measures nothing.
 
 #include "fmap/evaluation.hpp"
 
@@ -32,7 +31,7 @@ void test_geodesic_distances() {
   check(d.minCoeff() >= 0.0, "distances are non-negative");
   check(d.allFinite(), "mesh is connected, so all are finite");
 
-  // A path along edges can never be shorter than the straight line.
+  // An edge path can never beat the straight line.
   bool dominates = true;
   for (Eigen::Index i = 0; i < mesh.num_vertices(); i += 97) {
     const double euclidean = (mesh.V.row(i) - mesh.V.row(0)).norm();
@@ -53,7 +52,7 @@ void test_ground_truth_detection() {
   check(fmap::has_identity_ground_truth(cat0, cat1),
         "TOSCA meshes in a class are aligned");
 
-  // Different classes, and the partial mesh, must be rejected.
+  // Different classes and the partial mesh must be rejected.
   const Mesh horse = fmap::load_mesh("tosca:horse0");
   check(!fmap::has_identity_ground_truth(cat0, horse),
         "different shape classes are not aligned");
@@ -62,8 +61,7 @@ void test_ground_truth_detection() {
   check(!fmap::has_identity_ground_truth(horse, partial),
         "the partial horse is not aligned with its class");
 
-  // SCAPE poses share a registration but NOT a triangulation -- quads split
-  // along different diagonals -- so ground truth must not depend on it.
+  // Shared registration, different triangulation: ground truth must not use it.
   Eigen::Index differing = 0;
   for (Eigen::Index f = 0; f < a.F.rows(); ++f) {
     if (a.F.row(f) != b.F.row(f)) ++differing;
@@ -72,7 +70,7 @@ void test_ground_truth_detection() {
   std::cout << "       " << differing << " / " << a.F.rows()
             << " faces differ between two aligned SCAPE poses\n";
 
-  // Class membership is the dataset-level signal; it isolates the partial mesh.
+  // The dataset-level signal, which isolates the partial mesh.
   check(fmap::same_shape_class(fmap::resolve_mesh("scape:0"),
                                fmap::resolve_mesh("scape:1")),
         "SCAPE poses are in the same class");

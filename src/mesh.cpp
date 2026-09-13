@@ -24,9 +24,8 @@ std::string read_file(const std::filesystem::path& path) {
   return buf.str();
 }
 
-// Whitespace-separated tokens, '#' comments to end-of-line. OFF files vary in
-// how they wrap lines -- counts sometimes share the "OFF" header line -- so
-// tokenizing beats reading line by line.
+// Tokenized, not line-based: OFF files vary in wrapping, and counts sometimes
+// share the "OFF" header line. '#' comments to end-of-line.
 class TokenScanner {
  public:
   explicit TokenScanner(const std::string& text) : text_(text) {}
@@ -46,8 +45,7 @@ class TokenScanner {
   double next_double(const char* what) {
     std::string_view tok;
     if (!next(tok)) throw std::runtime_error(missing(what));
-    // strtod needs NUL termination; the scratch string avoids a fresh
-    // std::string per token in the hot loop.
+    // strtod needs NUL termination; scratch avoids a string per token.
     scratch_.assign(tok);
     const char* begin = scratch_.c_str();
     char* end = nullptr;
@@ -67,13 +65,12 @@ class TokenScanner {
     return value;
   }
 
-  // Advance past the remainder of the current line.
   void finish_line() {
     while (pos_ < text_.size() && text_[pos_] != '\n') ++pos_;
     if (pos_ < text_.size()) ++pos_;
   }
 
-  // Next line that carries actual content, with any trailing comment removed.
+  // Next content-bearing line, trailing comment removed.
   bool next_content_line(std::string_view& out) {
     while (pos_ < text_.size()) {
       const std::size_t start = pos_;
@@ -84,7 +81,6 @@ class TokenScanner {
           hash != std::string_view::npos) {
         line = line.substr(0, hash);
       }
-      // Content means at least one non-space character.
       if (line.find_first_not_of(" \t\r\n\f\v") != std::string_view::npos) {
         out = line;
         return true;
@@ -127,12 +123,10 @@ Mesh load_off(const std::filesystem::path& path) {
   if (!scan.next(magic)) {
     throw std::runtime_error("empty OFF file: " + path.string());
   }
-  // Accept the OFF variants -- COFF (colour), NOFF (normals), STOFF (texture),
-  // 4OFF (homogeneous). The vertex block is read a line at a time, taking only
-  // the leading coordinates, so any trailing per-vertex attributes work without
-  // the reader knowing how many numbers each adds. That matters because the
-  // colour block is genuinely ambiguous: COFF permits 1, 3, or 4 channels and
-  // the header does not say which.
+  // OFF variants: COFF (colour), NOFF (normals), STOFF (texture), 4OFF
+  // (homogeneous). Reading the vertex block line-wise and taking only leading
+  // coordinates handles any trailing attributes -- necessary because COFF
+  // permits 1, 3, or 4 colour channels and the header does not say which.
   const bool homogeneous = magic.find('4') != std::string_view::npos;
   if (magic.find("OFF") == std::string_view::npos) {
     throw std::runtime_error("not an OFF file (bad magic '" +
@@ -141,8 +135,7 @@ Mesh load_off(const std::filesystem::path& path) {
 
   const long num_vertices = scan.next_long("vertex count");
   const long num_faces = scan.next_long("face count");
-  // Third header field is the edge count, unreliable (TOSCA's
-  // horse0_partial.off declares 0), so read and discarded.
+  // Edge count is unreliable (horse0_partial declares 0); read and discarded.
   (void)scan.next_long("edge count");
 
   if (num_vertices <= 0 || num_faces < 0) {
@@ -161,7 +154,7 @@ Mesh load_off(const std::filesystem::path& path) {
                                " vertices: " + path.string());
     }
 
-    // Take the leading coordinates and ignore whatever follows on the line.
+    // Leading coordinates only.
     const std::string buf(line);
     const char* cursor = buf.c_str();
     double xyzw[4] = {0, 0, 0, 1};
@@ -175,7 +168,7 @@ Mesh load_off(const std::filesystem::path& path) {
       cursor = end;
     }
 
-    // 4OFF stores homogeneous coordinates; divide through to get Cartesian.
+    // 4OFF is homogeneous; divide through.
     const double w = homogeneous ? xyzw[3] : 1.0;
     const double scale = (w != 0.0) ? 1.0 / w : 1.0;
     mesh.V(i, 0) = xyzw[0] * scale;
@@ -183,7 +176,7 @@ Mesh load_off(const std::filesystem::path& path) {
     mesh.V(i, 2) = xyzw[2] * scale;
   }
 
-  // Fan-triangulate polygons rather than reject an otherwise usable mesh.
+  // Fan-triangulate rather than reject a usable mesh.
   std::vector<std::array<int, 3>> tris;
   tris.reserve(static_cast<std::size_t>(num_faces));
   for (long f = 0; f < num_faces; ++f) {
@@ -240,8 +233,7 @@ Mesh load_obj(const std::filesystem::path& path) {
     mesh.V(static_cast<Eigen::Index>(i), 2) = attrib.vertices[3 * i + 2];
   }
 
-  // tinyobjloader returns separate position/normal/texcoord indices; only the
-  // position index defines connectivity.
+  // Only the position index defines connectivity.
   std::vector<std::array<int, 3>> tris;
   for (const tinyobj::shape_t& shape : reader.GetShapes()) {
     const auto& indices = shape.mesh.indices;
@@ -344,7 +336,7 @@ void write_colored_off(const std::filesystem::path& path, const Mesh& mesh,
   std::ofstream out(path);
   if (!out) throw std::runtime_error("could not write " + path.string());
 
-  // Integer 0-255 colour channels: the most widely accepted COFF flavour.
+  // Integer 0-255: the most widely accepted COFF flavour.
   out << "COFF\n"
       << mesh.num_vertices() << ' ' << mesh.num_faces() << " 0\n";
   for (Eigen::Index i = 0; i < mesh.V.rows(); ++i) {

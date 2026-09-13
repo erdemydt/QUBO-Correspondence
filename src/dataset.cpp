@@ -12,8 +12,7 @@
 namespace fmap {
 namespace {
 
-// The one place directory names appear. A new dataset is a row here, plus a
-// .gitignore line if the data lives in the repo.
+// The one place directory names appear.
 struct DatasetDir {
   const char* name;       // spec prefix, e.g. "scape"
   const char* directory;  // directory under the data root
@@ -28,20 +27,18 @@ bool is_mesh_extension(const std::filesystem::path& ext) {
   return ext == ".off" || ext == ".obj" || ext == ".ply";
 }
 
-// Shape class: strip the trailing index, "cat3" -> "cat". Meshes in a group are
-// the ones that may share a vertex numbering. This deliberately leaves
-// "horse0_partial" in its own group -- it has a different vertex count and is
-// not vertex-aligned with the horse class.
+// Strip the trailing index: "cat3" -> "cat". Groups are the meshes that may
+// share a vertex numbering, so leaving "horse0_partial" in its own is correct.
 std::string group_of(const std::string& stem) {
   std::size_t end = stem.size();
   while (end > 0 && std::isdigit(static_cast<unsigned char>(stem[end - 1]))) {
     --end;
   }
-  // A stem that is all digits has no class name; treat the whole thing as one.
+  // All digits means no class name.
   return end == 0 ? stem : stem.substr(0, end);
 }
 
-// Trailing integer, or -1. For natural ordering: mesh10 sorts after mesh9.
+// Trailing integer, or -1, so mesh10 sorts after mesh9.
 long index_of(const std::string& stem) {
   std::size_t end = stem.size();
   while (end > 0 && std::isdigit(static_cast<unsigned char>(stem[end - 1]))) {
@@ -106,13 +103,11 @@ MeshRef DatasetRegistry::resolve(std::string_view spec) const {
   const std::string dataset(spec.substr(0, colon));
   const std::string id(spec.substr(colon + 1));
 
-  // Exact stem match.
   for (const MeshRef& m : meshes_) {
     if (m.dataset == dataset && m.stem == id) return m;
   }
 
-  // Bare integer: match against the numeric suffix, so "scape:7" finds
-  // mesh007 without the caller knowing the zero-padding width.
+  // Bare integer matches the numeric suffix, so "scape:7" finds mesh007.
   const bool numeric = !id.empty() &&
                        std::all_of(id.begin(), id.end(), [](unsigned char c) {
                          return std::isdigit(c);
@@ -122,7 +117,7 @@ MeshRef DatasetRegistry::resolve(std::string_view spec) const {
     const MeshRef* match = nullptr;
     for (const MeshRef& m : meshes_) {
       if (m.dataset == dataset && index_of(m.stem) == wanted) {
-        // Ambiguous if several groups share the index (TOSCA cat0, dog0, ...).
+        // Ambiguous if groups share the index (cat0, dog0, ...).
         if (match != nullptr) {
           match = nullptr;
           break;
@@ -133,7 +128,7 @@ MeshRef DatasetRegistry::resolve(std::string_view spec) const {
     if (match != nullptr) return *match;
   }
 
-  // Failed: report what is actually available rather than just the miss.
+  // Report what is available, not just the miss.
   std::ostringstream msg;
   msg << "could not resolve mesh spec '" << spec << "'.\n";
 

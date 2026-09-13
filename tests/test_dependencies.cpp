@@ -1,8 +1,6 @@
-// Proves the third-party stack compiles and runs together before any pipeline
-// code is built on it. The Spectra section is the point: SymGEigsShiftSolver is
-// the most failure-prone part of the pipeline, so it is exercised here on a
-// problem shaped like the real one -- a Neumann Laplacian, smallest eigenvalue
-// exactly 0.
+// Proves the stack compiles and runs before pipeline code is built on it.
+// SymGEigsShiftSolver is the most failure-prone part, so it runs here against a
+// Neumann Laplacian -- same shape as the real problem, smallest eigenvalue 0.
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -22,8 +20,7 @@ using namespace fmap::test;
 
 namespace {
 
-// 1D Neumann Laplacian on a path graph: symmetric, PSD, rows sum to zero, so
-// lambda_0 == 0 on a constant eigenvector -- the cotangent Laplacian's structure.
+// Symmetric, PSD, rows sum to zero: the cotangent Laplacian's structure.
 Eigen::SparseMatrix<double> path_laplacian(int n) {
   std::vector<Eigen::Triplet<double>> t;
   for (int i = 0; i + 1 < n; ++i) {
@@ -44,7 +41,7 @@ void test_spectra_shift_invert() {
   const int k = 3;
   Eigen::SparseMatrix<double> l = path_laplacian(n);
 
-  // Lumped mass matrix stand-in: diagonal and positive, like the real one.
+  // Mass stand-in: diagonal and positive, like the real one.
   Eigen::SparseMatrix<double> m(n, n);
   m.setIdentity();
   m *= 0.5;
@@ -55,8 +52,7 @@ void test_spectra_shift_invert() {
   OpType op(l, m);
   BOpType bop(m);
 
-  // Just below zero: the Laplacian is singular at exactly 0, so shifting there
-  // makes the factorization rank-deficient.
+  // Just below zero: shifting to exactly 0 makes the factorization singular.
   const double sigma = -1e-8;
   Spectra::SymGEigsShiftSolver<OpType, BOpType, Spectra::GEigsMode::ShiftInvert>
       eigs(op, bop, k, 2 * k + 1, sigma);
@@ -68,7 +64,7 @@ void test_spectra_shift_invert() {
   check(converged == k, "all requested eigenpairs converged");
 
   const Eigen::VectorXd vals = eigs.eigenvalues();
-  // Spectra returns eigenvalues in descending order here; we want ascending.
+  // Spectra returns descending; we want ascending.
   check_near(vals(k - 1), 0.0, 1e-8, "lambda_0 is zero");
   check(vals(k - 2) > vals(k - 1), "eigenvalues are strictly increasing");
   check(vals.minCoeff() > -1e-8, "no negative eigenvalues");
@@ -77,7 +73,7 @@ void test_spectra_shift_invert() {
 void test_nanoflann_knn() {
   section("nanoflann: KD-tree nearest neighbour on an Eigen matrix");
 
-  // 4 points on a line in 2D; the nearest neighbour of (2.9, 0) is row 3.
+  // 4 collinear points; the neighbour of (2.9, 0) is row 3.
   Eigen::MatrixXd points(4, 2);
   points << 0.0, 0.0, 1.0, 0.0, 2.0, 0.0, 3.0, 0.0;
 

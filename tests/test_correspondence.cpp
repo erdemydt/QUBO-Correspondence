@@ -1,7 +1,5 @@
-// Point-to-point recovery. The self-map case is exact: mapping a mesh to itself
-// must recover the identity on every vertex. That pins the embedding
-// convention -- notably which side C is applied on, easy to transpose and hard
-// to notice otherwise.
+// The self-map is exact: a mesh mapped to itself must recover the identity on
+// every vertex, which pins which side C is applied on.
 
 #include "fmap/correspondence.hpp"
 
@@ -52,7 +50,7 @@ void test_self_map_is_identity() {
   std::cout << "       " << exact << " / " << recovered.size()
             << " exact (" << rate * 100.0 << "%), " << seconds << "s\n";
 
-  // A perfect self map is a bijection, so coverage must be complete.
+  // A perfect self map is a bijection.
   const auto stats = fmap::analyze_map(recovered, mesh.num_vertices());
   check(stats.coverage > 0.999, "self map is a bijection");
 }
@@ -81,8 +79,8 @@ void test_pose_pair() {
 
   const auto stats = fmap::analyze_map(recovered, b.num_vertices());
 
-  // NN recovery is not injective -- each source picks its target independently,
-  // so targets get reused. This is the baseline a combinatorial method beats.
+  // NN is not injective: each source picks independently, so targets get
+  // reused. The baseline a combinatorial method beats.
   check(stats.coverage < 1.0, "recovery is not a bijection");
   check(stats.coverage > 0.3, "but it does spread across the target");
 

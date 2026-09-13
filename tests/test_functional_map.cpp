@@ -1,6 +1,5 @@
-// The functional map solve. The self-map pins everything down: mapping a mesh
-// to itself must give C = I, so any error in projection, in the basis, or in
-// the normal equations shows up immediately.
+// The self-map pins everything down: a mesh mapped to itself must give C = I,
+// so errors in projection, basis, or normal equations surface immediately.
 
 #include "fmap/functional_map.hpp"
 
@@ -47,8 +46,7 @@ void test_self_map() {
   check(map.descriptor_residual < 0.05, "descriptors are well fitted");
   check(map.orthogonality_error() < 0.1, "C is near-orthogonal");
 
-  // The constant function must map to the constant function: both shapes have
-  // the same total area here, so C(0,0) is 1.
+  // Constant to constant, and equal areas here, so C(0,0) is 1.
   check_near(map.C(0, 0), 1.0, 0.01, "constant mode maps to itself");
 }
 
@@ -67,13 +65,10 @@ void test_pose_pair() {
   check(map.C.allFinite(), "C is finite");
   check(map.descriptor_residual < 0.5, "descriptors are reasonably fitted");
 
-  // For near-isometric shapes C is banded -- "funnel shaped" -- not diagonal:
-  // low frequencies map to low frequencies, concentrating energy near the
-  // diagonal. Asserting strict diagonality would be wrong, because about a
-  // third of this mesh's eigenvalues are near-degenerate pairs (see
-  // test_descriptors) whose eigenfunctions are defined only up to a rotation of
-  // their shared eigenspace, which C absorbs as an off-diagonal block. Band
-  // energy is what actually characterizes a good map.
+  // C is banded, not diagonal: asserting strict diagonality would be wrong,
+  // since ~a third of these eigenvalues are near-degenerate pairs whose
+  // eigenfunctions are defined only up to a rotation, which C absorbs
+  // off-diagonal. Band energy is what characterizes a good map.
   const Eigen::Index probe = 20;
   const Eigen::MatrixXd block = map.C.topLeftCorner(probe, probe);
   double diagonal_energy = 0.0;
@@ -116,8 +111,7 @@ void test_regularization_effect() {
   const FunctionalMap regularized =
       fmap::solve_functional_map(ba, bb, da, db, strong);
 
-  // More regularization trades descriptor fit for commutativity, which is the
-  // entire point of the term.
+  // Trading descriptor fit for commutativity is the point of the term.
   check(regularized.commutativity_residual <
             unregularized.commutativity_residual,
         "regularization reduces the commutativity residual");
@@ -141,7 +135,6 @@ void test_validation() {
 
   bool threw = false;
   try {
-    // Mismatched descriptor counts between the two shapes.
     fmap::solve_functional_map(basis, basis, desc, desc.leftCols(2));
   } catch (const std::runtime_error&) {
     threw = true;

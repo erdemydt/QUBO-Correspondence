@@ -1,4 +1,3 @@
-// Mesh loading, writing, and the OFF variant handling.
 
 #include "fmap/mesh.hpp"
 
@@ -25,8 +24,7 @@ void test_load_scape() {
   check(m.surface_area() > 0.0, "positive surface area");
   check(m.bounding_box_diagonal() > 0.0, "non-degenerate bounding box");
 
-  // An unused vertex gives the Laplacian an all-zero row and the eigensolve
-  // spurious null modes.
+  // An unused vertex gives L an all-zero row and spurious null modes.
   Eigen::VectorXi used = Eigen::VectorXi::Zero(m.num_vertices());
   for (Eigen::Index f = 0; f < m.F.rows(); ++f) {
     for (int k = 0; k < 3; ++k) used(m.F(f, k)) = 1;
@@ -41,8 +39,7 @@ void test_load_tosca() {
   check(cat.num_vertices() == 27894, "cat0 has 27894 vertices");
   check(cat.num_faces() == 55712, "cat0 has 55712 faces");
 
-  // Declares an edge count of 0 in its header. Loading it proves that field is
-  // being ignored rather than trusted.
+  // Declares edge count 0, proving that field is ignored, not trusted.
   const Mesh partial = fmap::load_mesh("tosca:horse0_partial");
   check(partial.num_vertices() == 15974,
         "horse0_partial loads despite a bogus edge count");
@@ -72,8 +69,7 @@ void test_round_trip() {
   check((reloaded.F - original.F).cwiseAbs().maxCoeff() == 0,
         "connectivity survives a round trip");
 
-  // The variant-header path: skip the extra colour channels, still land on the
-  // face block.
+  // Variant header: skip the colour channels, still land on the face block.
   const std::filesystem::path colored = dir / "colored.off";
   fmap::write_colored_off(colored, original, fmap::position_colors(original));
   const Mesh recolored = fmap::load_mesh_file(colored);

@@ -1,7 +1,6 @@
-// Minimal assertion helpers -- deliberately not a test framework. Every
-// dependency here is header-only and hand-wrapped, and GTest just to compare
-// doubles would be the heaviest thing in the build. Each test is a plain
-// executable returning non-zero on failure, which is all CTest needs.
+// Deliberately not a test framework: GTest just to compare doubles would be the
+// heaviest thing in the build. A plain executable returning non-zero is all
+// CTest needs.
 
 #pragma once
 
@@ -23,8 +22,7 @@ inline void check(bool ok, const std::string& what) {
   }
 }
 
-// Absolute tolerance: the values here are physical quantities (areas,
-// eigenvalues) of known scale, easier to reason about than relative error.
+// Absolute tolerance: these are physical quantities of known scale.
 inline void check_near(double got, double want, double tol,
                        const std::string& what) {
   const bool ok = std::abs(got - want) <= tol;
@@ -41,7 +39,7 @@ inline void section(const std::string& name) {
   std::cout << name << '\n';
 }
 
-// Return from main(): prints a summary and yields the exit code.
+// Return from main().
 inline int summary() {
   if (failures == 0) {
     std::cout << "PASS\n";

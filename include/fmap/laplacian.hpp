@@ -1,6 +1,4 @@
-// Cotangent stiffness L and lumped mass M, defining the generalized
-// eigenproblem L phi = lambda M phi whose eigenfunctions are the spectral
-// basis. See spectral_basis.hpp for the solve.
+// Cotangent stiffness and lumped mass for L phi = lambda M phi.
 
 #pragma once
 
@@ -11,26 +9,18 @@
 namespace fmap {
 
 struct LaplacianOperator {
-  // n x n, symmetric, rows sum to zero. Positive semi-definite convention
-  // (L = D - W, off-diagonals -w_ij), so eigenvalues are >= 0 with lambda_0 = 0
-  // on the constant function. Much of the literature uses the opposite sign;
-  // this is the one the eigensolver wants.
+  // PSD convention (L = D - W): lambda >= 0, lambda_0 = 0. The literature often
+  // uses the opposite sign; this is the one the eigensolver wants.
   Eigen::SparseMatrix<double> L;
 
-  // Lumped: M_ii is a third of the incident triangle area, so entries sum to
-  // the surface area. Diagonal keeps the eigenproblem cheap and M^{-1/2}
-  // trivial; the accuracy cost over a full Galerkin mass matrix is not material
-  // at these mesh densities.
+  // Lumped, a third of each incident triangle: entries sum to surface area and
+  // M^{-1/2} is trivial, at negligible accuracy cost here.
   Eigen::SparseMatrix<double> M;
 
-  Eigen::VectorXd mass;  // diagonal of M, which is what most callers want
-
+  Eigen::VectorXd mass;  // diagonal of M
   Eigen::Index size() const { return mass.size(); }
 
-  // Obtuse triangles give negative cotangent weights. A few are harmless; a
-  // large fraction means L may not be PSD and the eigensolve can return small
-  // negative eigenvalues.
-  Eigen::Index obtuse_triangles = 0;
+  Eigen::Index obtuse_triangles = 0;  // negative weights; many => L not PSD
 };
 
 LaplacianOperator build_laplacian(const Mesh& mesh);

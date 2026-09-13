@@ -1,16 +1,10 @@
-// Turning a functional map back into a vertex-to-vertex correspondence.
+// Functional map -> vertex map. A vertex's delta function has coefficients
+// equal to its row of Phi, so T(i) = argmin_j ||C Phi1(i,:)^T - Phi2(j,:)^T||.
 //
-// A vertex's delta function has coefficients equal to its row of Phi, so
-// applying C to source vertex i's embedding says where it lands in the target's
-// spectral coordinates; the answer is the nearest target embedding:
-//
-//     T(i) = argmin_j || C * Phi1(i,:)^T - Phi2(j,:)^T ||
-//
-// This is the extension point. Nearest neighbour is the classic baseline and
-// also the pipeline's weakest link: it treats every vertex independently, so
-// nothing stops it collapsing many sources onto one target or tearing
-// neighbours apart. Posing recovery as combinatorial assignment -- QUBO among
-// them -- is how the bijectivity and smoothness lost here get imposed.
+// The extension point. Nearest neighbour is the baseline and the weakest link:
+// it treats each vertex independently, so nothing stops it collapsing many
+// sources onto one target. Combinatorial assignment -- QUBO among them -- is
+// how the lost bijectivity and smoothness get imposed.
 
 #pragma once
 
@@ -24,7 +18,7 @@
 
 namespace fmap {
 
-// Target index per source vertex: size n1, values in [0, n2).
+// Size n1, values in [0, n2).
 using PointMap = Eigen::VectorXi;
 
 enum class RecoveryMethod {
@@ -32,12 +26,10 @@ enum class RecoveryMethod {
 };
 
 std::string to_string(RecoveryMethod method);
-
-// Throws std::runtime_error listing the valid names.
 RecoveryMethod recovery_method_from_string(const std::string& name);
 
-// Takes the full bases rather than just the embeddings: a combinatorial method
-// will want the eigenvalues and mass for smoothness or area-preservation terms.
+// Takes full bases, not just embeddings: a combinatorial method wants the
+// eigenvalues and mass for smoothness or area-preservation terms.
 class CorrespondenceStrategy {
  public:
   virtual ~CorrespondenceStrategy() = default;
@@ -58,11 +50,10 @@ class NearestNeighborStrategy : public CorrespondenceStrategy {
 
 std::unique_ptr<CorrespondenceStrategy> make_strategy(RecoveryMethod method);
 
-// Diagnostics that need no ground truth. A bijection would hit every target;
-// these are the numbers that show how far from one the recovery is.
+// How far from a bijection the recovery is; needs no ground truth.
 struct MapStatistics {
   Eigen::Index distinct_targets = 0;
-  double coverage = 0.0;  // distinct_targets / target vertex count
+  double coverage = 0.0;
   Eigen::Index max_collisions = 0;
 };
 

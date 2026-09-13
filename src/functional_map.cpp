@@ -37,7 +37,7 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
   const Eigen::Index k1 = source.count();
   const Eigen::Index k2 = target.count();
 
-  // Project the descriptors into each basis. A is k1 x d, B is k2 x d.
+  // A is k1 x d, B is k2 x d.
   const Eigen::MatrixXd A = source.project(source_descriptors);
   const Eigen::MatrixXd B = target.project(target_descriptors);
 
@@ -45,8 +45,7 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
     throw std::runtime_error("no descriptors supplied; C is unconstrained");
   }
 
-  // Normalize eigenvalues so the commutativity weights are O(1) and the
-  // weight parameter means the same thing regardless of mesh scale.
+  // Normalized so the weights are O(1) and the knob is mesh-independent.
   const double scale1 = source.eigenvalues(k1 - 1);
   const double scale2 = target.eigenvalues(k2 - 1);
   if (!(scale1 > 0.0) || !(scale2 > 0.0)) {
@@ -62,15 +61,11 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
   FunctionalMap result;
   result.C.resize(k2, k1);
 
-  // One ridge regression per row. The penalty is diagonal but differs per row,
-  // which is why this decomposes: row i pairs target frequency lambda2_i
-  // against every source frequency, pushing mismatched pairings toward zero.
-  //
-  // A A^T has rank at most d, so fewer descriptors than basis functions leaves
-  // it singular. The penalty regularizes most of that away but not entry (0,0),
-  // where lambda1_0 = lambda2_0 = 0 on a closed surface makes it vanish. The
-  // Tikhonov ridge covers that hole, scaled to the data so it stays negligible
-  // against the descriptor term rather than biasing the fit.
+  // One ridge regression per row: the penalty is diagonal but row-dependent,
+  // which is what decouples them. A A^T has rank at most d, so d < k leaves it
+  // singular; the penalty fixes that everywhere but (0,0), where both lambda_0
+  // are 0 and it vanishes. The Tikhonov ridge covers that hole, scaled to the
+  // data so it does not bias the fit.
   const double ridge = 1e-9 * AAt.trace() / static_cast<double>(k1);
 
   Eigen::MatrixXd system(k1, k1);
@@ -81,7 +76,6 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
       system(j, j) += options.commutativity_weight * gap * gap + ridge;
     }
 
-    // Symmetric and, with the ridge above, positive definite.
     const Eigen::LDLT<Eigen::MatrixXd> solver(system);
     if (solver.info() != Eigen::Success) {
       throw std::runtime_error(
@@ -101,7 +95,6 @@ FunctionalMap solve_functional_map(const SpectralBasis& source,
         "system is likely rank deficient");
   }
 
-  // Residuals, for reporting.
   const double b_norm = B.norm();
   result.descriptor_residual =
       (result.C * A - B).norm() / (b_norm > 0.0 ? b_norm : 1.0);

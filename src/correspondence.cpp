@@ -11,8 +11,7 @@
 namespace fmap {
 namespace {
 
-// Row-major so each point is contiguous: both the tree build and the per-query
-// distance evaluations walk points row by row.
+// Row-major: the tree build and per-query scans walk points row by row.
 using EmbeddingMatrix =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
@@ -50,8 +49,7 @@ PointMap NearestNeighborStrategy::recover(const FunctionalMap& map,
         std::to_string(target.count()));
   }
 
-  // Push every source vertex's embedding through C. Row i of Phi1 * C^T is
-  // C * Phi1(i,:)^T, i.e. where source vertex i lands in target coordinates.
+  // Row i of Phi1 * C^T is C * Phi1(i,:)^T: where source i lands in target.
   const EmbeddingMatrix queries = source.eigenvectors * map.C.transpose();
   const EmbeddingMatrix points = target.eigenvectors;
 
@@ -64,13 +62,12 @@ PointMap NearestNeighborStrategy::recover(const FunctionalMap& map,
   }
 
   using KDTree = nanoflann::KDTreeEigenMatrixAdaptor<EmbeddingMatrix>;
-  // Leaf size 16: at ~100 dimensions the tree is shallow and most work is in
-  // leaf scans, which vectorize better with larger leaves than the default.
+  // Leaf 16: at ~100 dims leaf scans dominate and vectorize better than the
+  // library default.
   KDTree tree(dimension, std::cref(points), 16);
 
   PointMap result(num_sources);
 
-  // Queries are independent, and there are as many as there are vertices.
   parallel_for(static_cast<std::size_t>(num_sources), [&](std::size_t i) {
     Eigen::Index index = 0;
     double distance_squared = 0.0;

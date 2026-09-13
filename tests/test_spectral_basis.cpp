@@ -1,6 +1,5 @@
 // The eigenbasis properties every later stage assumes: ascending non-negative
-// eigenvalues, a constant first eigenfunction, M-orthonormality, and projection
-// followed by reconstruction acting as a well-behaved low-pass filter.
+// eigenvalues, a constant first mode, M-orthonormality, and low-pass round trip.
 
 #include "fmap/spectral_basis.hpp"
 
@@ -34,7 +33,6 @@ void test_spectrum(const char* spec, int k) {
   check(basis.count() == k, "returned k eigenpairs");
   check(basis.size() == mesh.num_vertices(), "eigenvectors span the mesh");
 
-  // Ascending and non-negative.
   bool ascending = true;
   for (Eigen::Index i = 1; i < basis.eigenvalues.size(); ++i) {
     if (basis.eigenvalues(i) < basis.eigenvalues(i - 1)) ascending = false;
@@ -42,7 +40,7 @@ void test_spectrum(const char* spec, int k) {
   check(ascending, "eigenvalues are ascending");
   check(basis.eigenvalues.minCoeff() >= 0.0, "eigenvalues are non-negative");
 
-  // On a closed surface the first mode is constant with eigenvalue 0.
+  // Closed surface: first mode constant, eigenvalue 0.
   const double scale = basis.eigenvalues(basis.count() - 1);
   check(basis.eigenvalues(0) < 1e-8 * scale, "lambda_0 is ~0");
   check(basis.eigenvalues(1) > 1e-6 * scale, "lambda_1 is clearly positive");
@@ -52,10 +50,10 @@ void test_spectrum(const char* spec, int k) {
       (first.maxCoeff() - first.minCoeff()) / std::abs(first.mean());
   check(spread < 1e-6, "first eigenfunction is constant");
 
-  // M-orthonormality is what makes projection a plain transpose.
+  // What makes projection a plain transpose.
   check(basis.orthonormality_error() < 1e-8, "basis is M-orthonormal");
 
-  // Residual of the generalized eigenproblem for a mid-spectrum mode.
+  // Eigenproblem residual for a mid-spectrum mode.
   const Eigen::Index probe = basis.count() / 2;
   const Eigen::VectorXd phi = basis.eigenvectors.col(probe);
   const Eigen::VectorXd residual =
@@ -78,8 +76,7 @@ void test_reconstruction() {
   options.k = 100;
   const SpectralBasis basis = fmap::compute_spectral_basis(op, options);
 
-  // A constant lies exactly in the first eigenfunction's span, so it must
-  // reconstruct essentially perfectly.
+  // A constant lies in the first mode's span, so it must be exact.
   const Eigen::VectorXd constant =
       Eigen::VectorXd::Constant(mesh.num_vertices(), 3.0);
   const Eigen::VectorXd round_trip =
@@ -87,8 +84,7 @@ void test_reconstruction() {
   check((round_trip - constant).cwiseAbs().maxCoeff() < 1e-6,
         "constant function reconstructs exactly");
 
-  // A coordinate is smooth and should reconstruct well from 100 modes -- the
-  // low-pass behaviour the whole method relies on.
+  // A coordinate is smooth: the low-pass behaviour the method relies on.
   const Eigen::VectorXd x = mesh.V.col(0);
   const Eigen::VectorXd x_hat = basis.reconstruct(basis.project(x));
   const double relative_error =
@@ -97,8 +93,7 @@ void test_reconstruction() {
   std::cout << "       coordinate reconstruction error: "
             << relative_error * 100.0 << "%\n";
 
-  // Projection must be mass-weighted. A plain dot product would already break
-  // the round trip above, but check the coefficient too: <phi_0,1>_M = area*phi_0.
+  // Must be mass-weighted: <phi_0,1>_M = area * phi_0.
   const Eigen::VectorXd coeffs = basis.project(constant);
   check(std::abs(coeffs(0)) > 1e-6, "constant has a non-trivial DC coefficient");
   check(coeffs.tail(basis.count() - 1).cwiseAbs().maxCoeff() < 1e-6,
@@ -128,7 +123,7 @@ void test_validation() {
   huge_k.k = static_cast<int>(mesh.num_vertices());
   check(rejects(huge_k), "k >= n is rejected");
 
-  // A non-negative shift makes (L - sigma*M) singular, since lambda_0 == 0.
+  // Non-negative shift makes (L - sigma*M) singular, since lambda_0 == 0.
   SpectralOptions bad_shift;
   bad_shift.shift_fraction = 0.0;
   check(rejects(bad_shift), "non-negative shift is rejected");
@@ -137,9 +132,8 @@ void test_validation() {
 }  // namespace
 
 int main() {
-  // SCAPE and TOSCA areas differ by ~4 orders of magnitude and eigenvalues
-  // scale as 1/area, so running both proves the shift is placed relative to the
-  // spectrum rather than at a hardcoded absolute value.
+  // Areas differ by ~4 orders of magnitude and eigenvalues scale as 1/area, so
+  // running both proves the shift is relative, not hardcoded.
   test_spectrum("scape:0", 100);
   test_spectrum("tosca:cat0", 100);
   test_reconstruction();
